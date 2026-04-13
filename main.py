@@ -1,134 +1,133 @@
 import math
 import matplotlib.pyplot as plt
-from typing import Callable
 
-# Question 1
-g = 9.8
+g = 9.81
 l = 1.0
 
-# Question 2
+
+# Q2
 def subdiv_reg(a, b, n):
-    h = (b - a) / n
-    return [a + i * h for i in range(n + 1)]
+    return [a + i * (b - a) / n for i in range(n + 1)]
 
 
-# Question 3
+# Q3
 def int_rectangle(f, subdiv):
-    somme = 0.0
+    somme = 0
     for i in range(len(subdiv) - 1):
         h = subdiv[i+1] - subdiv[i]
         somme += f(subdiv[i]) * h
     return somme
 
-# Question 4
+
+# Q4
 def int_trapeze(f, subdiv):
-    somme = 0.0
+    somme = 0
     for i in range(len(subdiv) - 1):
         h = subdiv[i+1] - subdiv[i]
         somme += (f(subdiv[i]) + f(subdiv[i+1])) / 2 * h
     return somme
 
 
-# Question 5
-def f_q5(x):
-    return math.sqrt(1 - x**2)
+# Q5
+def verif_methodes():
+    f = lambda x: math.sqrt(1 - x**2)
+    val = math.pi / 4
+    print(f"{'n':>7} | {'Err Rectangle':>15} | {'Err Trapeze':>15}")
+    print("-" * 45)
+    for n in [100, 1000, 10000]:
+        sub = subdiv_reg(0, 1, n)
+        er = abs(int_rectangle(f, sub) - val)
+        et = abs(int_trapeze(f, sub) - val)
+        print(f"{n:7d} | {er:15.8e} | {et:15.8e}")
 
-print("Question 5 :")
-I_exact = math.pi / 4
-for n in [100, 1000, 10000]:
-    sub = subdiv_reg(0, 1, n)
-    err_rect = abs(int_rectangle(f_q5, sub) - I_exact)
-    err_trap = abs(int_trapeze(f_q5, sub) - I_exact)
-    print(f"n={n} | Err Rectangle: {err_rect:.6f} | Err Trapèze: {err_trap:.6f}")
 
-
-# Question 6
+# Q6
 def periode(theta_max):
-    def f_periode(theta):
-        return 1.0 / math.sqrt(math.cos(theta) - math.cos(theta_max))
-    
-    # On s'arrête un peu avant theta_max pour éviter la division par zéro à la borne
-    sub = subdiv_reg(0, theta_max - 1e-5, 5000)
-    
-    # La méthode des trapèzes est déconseillée car elle nous forcerait 
-    # à calculer f(theta_max) ce qui déclencherait une division par zéro.
-    return 2 * math.sqrt(2 * l / g) * int_rectangle(f_periode, sub)
+    def integrand(theta):
+        d = math.cos(theta) - math.cos(theta_max)
+        if d <= 0:
+            return 0
+        return 1 / math.sqrt(d)
+    sub = subdiv_reg(0, theta_max - 1e-7, 10000)
+    return 2 * math.sqrt(2 * l / g) * int_rectangle(integrand, sub)
 
 
-# Question 7
+# Q7
 def trace_periode():
     thetas = subdiv_reg(0.1, 3.14, 500)
-    T = [periode(t) for t in thetas]
-    
-    plt.plot(thetas, T)
-    plt.xlabel("Theta max (rad)")
-    plt.ylabel("Période T (s)")
-    plt.title("Évolution de la période en fonction de l'angle initial")
+    T0 = 2 * math.pi * math.sqrt(l / g)
+    plt.figure()
+    plt.plot(thetas, [periode(t) for t in thetas], label="T(theta_max)")
+    plt.axhline(y=T0, color='r', linestyle='--', label="T0")
+    plt.xlabel("theta_max (rad)")
+    plt.ylabel("Periode T (s)")
+    plt.title("Periode du pendule en fonction de l'amplitude")
+    plt.legend()
+    plt.grid(True)
     plt.show()
 
-# trace_periode()
 
-
-# Question 8
-def methode_Euler(x0: float, y0: float, xN: float, N: int, g: Callable[[float, float], float]) -> list:
+# Q8
+def methode_Euler(x0, y0, xN, N, f):
     h = (xN - x0) / N
-    x = x0
-    y = y0
-    y_vals = [y0]
-    
+    xs = [x0]
+    ys = [y0]
     for _ in range(N):
-        y = y + h * g(x, y)
-        x = x + h
-        y_vals.append(y)
-        
-    return y_vals
+        ys.append(ys[-1] + h * f(xs[-1], ys[-1]))
+        xs.append(xs[-1] + h)
+    return xs, ys
 
 
-# Question 9
-def f_exp(x, y):
-    return y
-
-x_vals_exp = subdiv_reg(0, 5, 100)
-y_vals_exp = methode_Euler(0, 1, 5, 100, f_exp)
-
-# plt.plot(x_vals_exp, y_vals_exp)
-# plt.title("Graphe de la fonction exponentielle (Euler)")
-# plt.show()
-
-
-# Question 10
-# L'approche d'Euler d'ordre 1 ne marche pas directement pour la position de la masse
-# car l'équation du pendule est une équation différentielle d'ordre 2.
+# Q9
+def trace_exp():
+    xs, ys = methode_Euler(0, 1, 2, 100, lambda x, y: y)
+    xs_ex = subdiv_reg(0, 2, 200)
+    plt.figure()
+    plt.plot(xs, ys, label="Euler")
+    plt.plot(xs_ex, [math.exp(x) for x in xs_ex], '--', label="exp(x)")
+    plt.title("y' = y, y(0) = 1")
+    plt.legend()
+    plt.grid(True)
+    plt.show()
 
 
-# Question 11
-def methode_Euler_2(x0: float, y0: float, yp0: float, xN: float, N: int, g: Callable[[float, float, float], float]) -> list:
+# Q10
+# Euler ordre 1 n'est pas adapté au pendule : l'énergie dérive à chaque pas,
+# l'amplitude augmente artificiellement. Il faut Euler ordre 2.
+
+
+# Q11
+def methode_Euler_2(x0, y0, yp0, xN, N, f):
     h = (xN - x0) / N
-    x = x0
-    y = y0
-    yp = yp0
-    y_vals = [y0]
-    
+    xs = [x0]
+    ys = [y0]
+    yps = [yp0]
     for _ in range(N):
-        yp_new = yp + h * g(x, y, yp)
-        y_new = y + h * yp
-        y = y_new
-        yp = yp_new
-        x = x + h
-        y_vals.append(y)
-        
-    return y_vals
+        y_new = ys[-1] + h * yps[-1]
+        yp_new = yps[-1] + h * f(xs[-1], ys[-1], yps[-1])
+        xs.append(xs[-1] + h)
+        ys.append(y_new)
+        yps.append(yp_new)
+    return xs, ys, yps
 
 
-# Question 12
-def f_pendule(x, y, yp):
-    return -(g / l) * math.sin(y)
+# Q12
+def simulation_pendule():
+    theta_max = math.pi / 4
+    f = lambda t, th, thp: -(g / l) * math.sin(th)
+    T = periode(theta_max)
+    xs, ys, _ = methode_Euler_2(0, theta_max, 0, 3 * T, 3000, f)
+    plt.figure()
+    plt.plot(xs, ys)
+    plt.title(f"Pendule - theta_max = {theta_max:.2f} rad, T = {T:.4f} s")
+    plt.xlabel("t (s)")
+    plt.ylabel("theta (rad)")
+    plt.grid(True)
+    plt.show()
 
-t_vals = subdiv_reg(0, 10, 1000)
-theta_vals = methode_Euler_2(0, 1.0, 0, 10, 1000, f_pendule)
 
-# plt.plot(t_vals, theta_vals)
-# plt.title("Mouvement du pendule simple (Euler ordre 2)")
-# plt.xlabel("Temps (s)")
-# plt.ylabel("Theta (rad)")
-# plt.show()
+if __name__ == "__main__":
+    verif_methodes()
+    trace_periode()
+    trace_exp()
+    simulation_pendule()
